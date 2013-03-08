@@ -1,11 +1,8 @@
 /**
- * editor_plugin_src.js
+ * $Id: editor_plugin_src.js 520 2008-01-07 16:30:32Z spocke $
  *
- * Copyright 2009, Moxiecode Systems AB
- * Released under LGPL License.
- *
- * License: http://tinymce.moxiecode.com/license
- * Contributing: http://tinymce.moxiecode.com/contributing
+ * @author Moxiecode
+ * @copyright Copyright © 2004-2008, Moxiecode Systems AB, All rights reserved.
  */
 
 (function() {
@@ -15,33 +12,30 @@
 
 			t.editor = ed;
 
-			function setDir(dir) {
-				var dom = ed.dom, curDir, blocks = ed.selection.getSelectedBlocks();
-
-				if (blocks.length) {
-					curDir = dom.getAttrib(blocks[0], "dir");
-
-					tinymce.each(blocks, function(block) {
-						// Add dir to block if the parent block doesn't already have that dir
-						if (!dom.getParent(block.parentNode, "*[dir='" + dir + "']", dom.getRoot())) {
-							if (curDir != dir) {
-								dom.setAttrib(block, "dir", dir);
-							} else {
-								dom.setAttrib(block, "dir", null);
-							}
-						}
-					});
-
-					ed.nodeChanged();
-				}
-			}
-
 			ed.addCommand('mceDirectionLTR', function() {
-				setDir("ltr");
+				var e = ed.dom.getParent(ed.selection.getNode(), ed.dom.isBlock);
+
+				if (e) {
+					if (ed.dom.getAttrib(e, "dir") != "ltr")
+						ed.dom.setAttrib(e, "dir", "ltr");
+					else
+						ed.dom.setAttrib(e, "dir", "");
+				}
+
+				ed.nodeChanged();
 			});
 
 			ed.addCommand('mceDirectionRTL', function() {
-				setDir("rtl");
+				var e = ed.dom.getParent(ed.selection.getNode(), ed.dom.isBlock);
+
+				if (e) {
+					if (ed.dom.getAttrib(e, "dir") != "rtl")
+						ed.dom.setAttrib(e, "dir", "rtl");
+					else
+						ed.dom.setAttrib(e, "dir", "");
+				}
+
+				ed.nodeChanged();
 			});
 
 			ed.addButton('ltr', {title : 'directionality.ltr_desc', cmd : 'mceDirectionLTR'});

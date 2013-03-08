@@ -10,9 +10,9 @@ var defaultFonts = "" +
 	"Geneva, Arial, Helvetica, sans-serif=Geneva, Arial, Helvetica, sans-serif";
 
 var defaultSizes = "9;10;12;14;16;18;24;xx-small;x-small;small;medium;large;x-large;xx-large;smaller;larger";
-var defaultMeasurement = "+pixels=px;points=pt;inches=in;centimetres=cm;millimetres=mm;picas=pc;ems=em;exs=ex;%";
-var defaultSpacingMeasurement = "pixels=px;points=pt;inches=in;centimetres=cm;millimetres=mm;picas=pc;+ems=em;exs=ex;%";
-var defaultIndentMeasurement = "pixels=px;+points=pt;inches=in;centimetres=cm;millimetres=mm;picas=pc;ems=em;exs=ex;%";
+var defaultMeasurement = "+pixels=px;points=pt;em;in;cm;mm;picas;ems;exs;%";
+var defaultSpacingMeasurement = "pixels=px;points=pt;in;cm;mm;picas;+ems;exs;%";
+var defaultIndentMeasurement = "pixels=px;+points=pt;in;cm;mm;picas;ems;exs;%";
 var defaultWeight = "normal;bold;bolder;lighter;100;200;300;400;500;600;700;800;900";
 var defaultTextStyle = "normal;italic;oblique";
 var defaultVariant = "normal;small-caps";
@@ -27,41 +27,10 @@ var defaultBorderStyle = "none;solid;dashed;dotted;double;groove;ridge;inset;out
 var defaultBorderWidth = "thin;medium;thick";
 var defaultListType = "disc;circle;square;decimal;lower-roman;upper-roman;lower-alpha;upper-alpha;none";
 
-function aggregateStyles(allStyles) {
-	var mergedStyles = {};
-
-	tinymce.each(allStyles, function(style) {
-		if (style !== '') {
-			var parsedStyles = tinyMCEPopup.editor.dom.parseStyle(style);
-			for (var name in parsedStyles) {
-				if (parsedStyles.hasOwnProperty(name)) {
-					if (mergedStyles[name] === undefined) {
-						mergedStyles[name] = parsedStyles[name];
-					}
-					else if (name === 'text-decoration') {
-						if (mergedStyles[name].indexOf(parsedStyles[name]) === -1) {
-							mergedStyles[name] = mergedStyles[name] +' '+ parsedStyles[name];
-						}
-					}
-				}
-			}
-		}
-	});
-
-  return mergedStyles;
-}
-
-var applyActionIsInsert;
-var existingStyles;
-
-function init(ed) {
+function init() {
 	var ce = document.getElementById('container'), h;
 
-	existingStyles = aggregateStyles(tinyMCEPopup.getWindowArg('styles'));
-	ce.style.cssText = tinyMCEPopup.editor.dom.serializeStyle(existingStyles);
-
-	applyActionIsInsert = ed.getParam("edit_css_style_insert_span", false);
-	document.getElementById('toggle_insert_span').checked = applyActionIsInsert;
+	ce.style.cssText = tinyMCEPopup.getWindowArg('style_text');
 
 	h = getBrowserHTML('background_image_browser','background_image','image','advimage');
 	document.getElementById("background_image_browser").innerHTML = h;
@@ -175,8 +144,6 @@ function setupFormData() {
 	f.text_overline.checked = inStr(ce.style.textDecoration, 'overline');
 	f.text_linethrough.checked = inStr(ce.style.textDecoration, 'line-through');
 	f.text_blink.checked = inStr(ce.style.textDecoration, 'blink');
-	f.text_none.checked = inStr(ce.style.textDecoration, 'none');
-	updateTextDecorations();
 
 	// Setup background fields
 
@@ -210,7 +177,11 @@ function setupFormData() {
 
 	f.box_height.value = getNum(ce.style.height);
 	selectByValue(f, 'box_height_measurement', getMeasurement(ce.style.height));
-	selectByValue(f, 'box_float', ce.style.cssFloat || ce.style.styleFloat, true, true);
+
+	if (tinymce.isGecko)
+		selectByValue(f, 'box_float', ce.style.cssFloat, true, true);
+	else
+		selectByValue(f, 'box_float', ce.style.styleFloat, true, true);
 
 	selectByValue(f, 'box_clear', ce.style.clear, true, true);
 
@@ -276,12 +247,12 @@ function setupFormData() {
 }
 
 function getMeasurement(s) {
-	return s.replace(/^([0-9.]+)(.*)$/, "$2");
+	return s.replace(/^([0-9]+)(.*)$/, "$2");
 }
 
 function getNum(s) {
-	if (new RegExp('^(?:[0-9.]+)(?:[a-z%]+)$', 'gi').test(s))
-		return s.replace(/[^0-9.]/g, '');
+	if (new RegExp('^[0-9]+[a-z%]+$', 'gi').test(s))
+		return s.replace(/[^0-9]/g, '');
 
 	return s;
 }
@@ -399,41 +370,13 @@ function hasEqualValues(a) {
 	return true;
 }
 
-function toggleApplyAction() {
-	applyActionIsInsert = ! applyActionIsInsert;
-}
-
 function applyAction() {
 	var ce = document.getElementById('container'), ed = tinyMCEPopup.editor;
 
 	generateCSS();
 
 	tinyMCEPopup.restoreSelection();
-
-	var newStyles = tinyMCEPopup.editor.dom.parseStyle(ce.style.cssText);
-
-	if (applyActionIsInsert) {
-		ed.formatter.register('plugin_style', {
-			inline: 'span', styles: existingStyles
-		});
-		ed.formatter.remove('plugin_style');
-
-		ed.formatter.register('plugin_style', {
-			inline: 'span', styles: newStyles
-		});
-		ed.formatter.apply('plugin_style');
-	} else {
-		var nodes;
-
-		if (tinyMCEPopup.getWindowArg('applyStyleToBlocks')) {
-			nodes = ed.selection.getSelectedBlocks();
-		}
-		else {
-			nodes = ed.selection.getNode();
-		}
-
-		ed.dom.setAttrib(nodes, 'style', tinyMCEPopup.editor.dom.serializeStyle(newStyles));
-	}
+	ed.dom.setAttrib(ed.selection.getNode(), 'style', tinyMCEPopup.editor.dom.serializeStyle(tinyMCEPopup.editor.dom.parseStyle(ce.style.cssText)));
 }
 
 function updateAction() {
@@ -497,7 +440,9 @@ function generateCSS() {
 	ce.style.width = f.box_width.value + (isNum(f.box_width.value) ? f.box_width_measurement.value : "");
 	ce.style.height = f.box_height.value + (isNum(f.box_height.value) ? f.box_height_measurement.value : "");
 	ce.style.styleFloat = f.box_float.value;
-	ce.style.cssFloat = f.box_float.value;
+
+	if (tinymce.isGecko)
+		ce.style.cssFloat = f.box_float.value;
 
 	ce.style.clear = f.box_clear.value;
 
@@ -533,7 +478,7 @@ function generateCSS() {
 		ce.style.borderBottomWidth = f.border_width_bottom.value + (isNum(f.border_width_bottom.value) ? f.border_width_bottom_measurement.value : "");
 		ce.style.borderLeftWidth = f.border_width_left.value + (isNum(f.border_width_left.value) ? f.border_width_left_measurement.value : "");
 	} else
-		ce.style.borderWidth = f.border_width_top.value + (isNum(f.border_width_top.value) ? f.border_width_top_measurement.value : "");
+		ce.style.borderWidth = f.border_width_top.value;
 
 	if (!f.border_color_same.checked) {
 		ce.style.borderTopColor = f.border_color_top.value;
@@ -691,19 +636,6 @@ function synch(fr, to) {
 
 	if (f.elements[fr + "_measurement"])
 		selectByValue(f, to + "_measurement", f.elements[fr + "_measurement"].value);
-}
-
-function updateTextDecorations(){
-	var el = document.forms[0].elements;
-
-	var textDecorations = ["text_underline", "text_overline", "text_linethrough", "text_blink"];
-	var noneChecked = el["text_none"].checked;
-	tinymce.each(textDecorations, function(id) {
-		el[id].disabled = noneChecked;
-		if (noneChecked) {
-			el[id].checked = false;
-		}
-	});
 }
 
 tinyMCEPopup.onInit.add(init);
